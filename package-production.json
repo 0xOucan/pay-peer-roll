@@ -1,0 +1,20 @@
+{
+  "name": "pay-peer-roll-production-deps",
+  "description": "Production dependencies for proper Ledger integration",
+  "dependencies": {
+    "@ledgerhq/device-management-kit": "^0.1.0",
+    "@ledgerhq/device-signer-kit-ethereum": "^0.1.0"
+  },
+  "installation": {
+    "command": "npm install @ledgerhq/device-management-kit @ledgerhq/device-signer-kit-ethereum",
+    "note": "Replace mock implementations in lib/ledger-sdk.ts with actual Ledger SDK imports"
+  },
+  "implementation_steps": [
+    "1. Install the official Ledger packages",
+    "2. Replace MockDeviceManagementKit with DeviceManagementKit",
+    "3. Replace MockSignerEth with SignerEthBuilder",
+    "4. Update createLedgerSDK to use real SDK initialization",
+    "5. Get origin token from Ledger for transaction checks",
+    "6. Test with actual Ledger device"
+  ]
+}

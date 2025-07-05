@@ -1,0 +1,59 @@
+{
+  "title": "Ledger Production Setup Instructions",
+  "description": "How to replace mock implementation with real Ledger libraries",
+  "steps": [
+    {
+      "step": 1,
+      "title": "Install Ledger Dependencies",
+      "command": "npm install @ledgerhq/hw-transport-webhid @ledgerhq/hw-app-eth @ledgerhq/errors",
+      "description": "Install the official Ledger hardware wallet libraries"
+    },
+    {
+      "step": 2,
+      "title": "Update Transport Creation",
+      "file": "lib/ledger-integration.ts",
+      "changes": [
+        "Import: import TransportWebHID from '@ledgerhq/hw-transport-webhid'",
+        "Replace createTransport() with: return await TransportWebHID.create()"
+      ]
+    },
+    {
+      "step": 3,
+      "title": "Update Ethereum App Creation",
+      "file": "lib/ledger-integration.ts",
+      "changes": [
+        "Import: import Eth from '@ledgerhq/hw-app-eth'",
+        "Replace createEthereumApp() with: return new Eth(transport)"
+      ]
+    },
+    {
+      "step": 4,
+      "title": "Remove Mock Delays",
+      "file": "lib/ledger-integration.ts",
+      "changes": ["Remove simulateDeviceInteraction() calls", "Remove artificial delays - real device handles timing"]
+    },
+    {
+      "step": 5,
+      "title": "Add Error Handling",
+      "file": "lib/ledger-integration.ts",
+      "changes": [
+        "Import: import { TransportError } from '@ledgerhq/errors'",
+        "Add proper error code mapping for real Ledger errors"
+      ]
+    }
+  ],
+  "testing": {
+    "requirements": [
+      "Physical Ledger device (Nano S, Nano X, or Nano S Plus)",
+      "Device unlocked and Ethereum app installed",
+      "Chrome/Edge/Opera browser with WebHID support",
+      "HTTPS connection (required for WebHID)"
+    ],
+    "verification": [
+      "Device discovery works",
+      "Address retrieval shows on device screen",
+      "Message signing requires device confirmation",
+      "Error messages are user-friendly"
+    ]
+  }
+}

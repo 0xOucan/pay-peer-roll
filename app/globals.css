@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    font-family: "MS Sans Serif", "Tahoma", "Arial", sans-serif;
+  }
+
+  body {
+    font-feature-settings: "liga" 0;
+  }
+}
+
+/* Windows 95 Style Borders */
+.border-outset {
+  border-top-color: white;
+  border-left-color: white;
+  border-right-color: #808080;
+  border-bottom-color: #808080;
+}
+
+.border-inset {
+  border-top-color: #808080;
+  border-left-color: #808080;
+  border-right-color: white;
+  border-bottom-color: white;
+}
+
+/* Custom scrollbar - Windows 95 style */
+::-webkit-scrollbar {
+  width: 16px;
+}
+
+::-webkit-scrollbar-track {
+  background: #c0c0c0;
+  border: 2px inset #c0c0c0;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  border: 2px outset #c0c0c0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #e0e0e0;
+}
+
+::-webkit-scrollbar-corner {
+  background: #c0c0c0;
+}
+
+/* Windows 95 button animations */
+.win95-button {
+  transition: all 0.1s ease;
+}
+
+.win95-button:active {
+  border-top-color: #808080;
+  border-left-color: #808080;
+  border-right-color: white;
+  border-bottom-color: white;
+}
+
+/* Classic Windows desktop pattern */
+.desktop-pattern {
+  background-image: repeating-linear-gradient(45deg, #008080, #008080 2px, #006666 2px, #006666 4px);
+}
+
+/* Pixel-perfect animations */
+@keyframes pixelPulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.pixel-pulse {
+  animation: pixelPulse 2s ease-in-out infinite;
+}
+
+/* File upload animations */
+.drag-active {
+  transform: scale(1.02);
+  box-shadow: 0 0 20px rgba(135, 169, 167, 0.3);
+}

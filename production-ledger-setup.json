@@ -1,0 +1,19 @@
+{
+  "note": "For production Ledger integration, install these packages:",
+  "dependencies": {
+    "@ledgerhq/device-management-kit": "^0.1.0",
+    "@ledgerhq/device-signer-kit-ethereum": "^0.1.0"
+  },
+  "installation": "npm install @ledgerhq/device-management-kit @ledgerhq/device-signer-kit-ethereum",
+  "implementation": {
+    "replace": "lib/ledger-signer.ts mock implementation",
+    "with": "Actual Ledger Device Management Kit integration",
+    "example": "See https://developers.ledger.com/docs/device-interaction/references/signers/eth"
+  },
+  "key_changes": {
+    "1": "Replace MockLedgerSigner with actual SignerEthBuilder",
+    "2": "Use real Device Management Kit SDK instance",
+    "3": "Handle proper observable states and user interactions",
+    "4": "Implement proper error handling for device states"
+  }
+}

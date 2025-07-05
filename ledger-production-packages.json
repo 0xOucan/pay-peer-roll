@@ -1,0 +1,26 @@
+{
+  "name": "ledger-production-setup",
+  "description": "Real Ledger integration packages and setup",
+  "required_packages": {
+    "@ledgerhq/hw-transport-webhid": "^6.28.1",
+    "@ledgerhq/hw-app-eth": "^6.34.1",
+    "@ledgerhq/errors": "^6.12.7"
+  },
+  "installation": "npm install @ledgerhq/hw-transport-webhid @ledgerhq/hw-app-eth @ledgerhq/errors",
+  "implementation_notes": {
+    "transport": "Replace createRealTransport() with TransportWebHID.create()",
+    "eth_app": "Replace createRealEthApp() with new Eth(transport)",
+    "error_handling": "Use @ledgerhq/errors for proper error mapping",
+    "testing": "Requires actual Ledger device connected via USB"
+  },
+  "browser_requirements": {
+    "webhid_support": "Chrome 89+, Edge 89+, Opera 75+",
+    "https_required": "WebHID only works over HTTPS",
+    "permissions": "User must grant HID device access"
+  },
+  "device_requirements": {
+    "firmware": "Latest firmware recommended",
+    "ethereum_app": "Ethereum app must be installed and open",
+    "device_state": "Device must be unlocked during operations"
+  }
+}
