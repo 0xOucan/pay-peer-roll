@@ -93,7 +93,7 @@ export const connectToLedger = async (
         reject(new Error("No Ledger devices found. Please ensure your device is connected and unlocked."));
       }, 10000); // 10 seconds timeout
     });
-  } catch (error) {
+    } catch (error) {
     console.error("Failed to connect to Ledger:", error);
     throw error;
   }
