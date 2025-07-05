@@ -33,16 +33,40 @@ export async function POST(request: NextRequest) {
     // Get tokens list to find the correct token
     const tokens = await client.getTokensList()
     console.log('Available tokens:', tokens)
+    console.log('Looking for token:', token)
     
-    // Find the token by symbol or address
-    let targetToken = tokens.find((t: any) => 
-      (token === 'ETH' && t.tokenType === 0) || // NATIVE token
-      (token === 'USDC' && t.contractAddress?.toLowerCase() === tokenAddress?.toLowerCase())
-    )
+    // Find the token by symbol or address with more robust matching
+    let targetToken = tokens.find((t: any) => {
+      console.log('Checking token:', { symbol: t.symbol, tokenType: t.tokenType, contractAddress: t.contractAddress })
+      
+      if (token === 'ETH') {
+        // For ETH, check multiple conditions
+        return (
+          (t.symbol === 'ETH' || t.symbol === 'eth') ||
+          (t.tokenType === 0) ||
+          (t.contractAddress === '0x0000000000000000000000000000000000000000')
+        )
+      }
+      
+      if (token === 'USDC' && tokenAddress) {
+        return t.contractAddress?.toLowerCase() === tokenAddress.toLowerCase()
+      }
+      
+      // Fallback: match by symbol
+      return t.symbol?.toLowerCase() === token.toLowerCase()
+    })
     
     if (!targetToken) {
+      console.log('Token not found. Available tokens:', tokens.map((t: any) => ({ 
+        symbol: t.symbol, 
+        tokenType: t.tokenType, 
+        contractAddress: t.contractAddress 
+      })))
       return NextResponse.json(
-        { error: `Token ${token} not found in available tokens list` },
+        { 
+          error: `Token ${token} not found in available tokens list`,
+          availableTokens: tokens.map((t: any) => t.symbol).filter(Boolean)
+        },
         { status: 400 }
       )
     }
