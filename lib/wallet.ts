@@ -1,6 +1,14 @@
 import { createWalletClient, custom, type WalletClient, type Address } from "viem"
 import { mainnet } from "viem/chains"
-import { connectRealLedger, signRealMessage, disconnectRealLedger, getLedgerManager } from "./ledger-real"
+import { 
+  connectToLedger, 
+  signMessageWithLedger, 
+  disconnectLedger, 
+  handleLedgerError 
+} from "./ledger-integration"
+
+// Welcome message for Pay-Peer-Roll app
+const WELCOME_MESSAGE = "Welcome to Pay-Peer-Roll App 🧻💸 Private payrolls, crystal-clear approvals."
 
 // Rabby wallet connection (unchanged)
 export const connectRabbyWallet = async (): Promise<WalletClient | null> => {
@@ -26,113 +34,90 @@ export const connectRabbyWallet = async (): Promise<WalletClient | null> => {
 
     return walletClient
   } catch (error) {
-    console.error("Failed to connect to Rabby wallet:", error)
+    console.error("Error connecting to Rabby wallet:", error)
     throw error
   }
 }
 
-// Real Ledger connection - no mocks
+// Ledger wallet connection using Device Management Kit
 export const connectLedgerDevice = async (
-  onStatusUpdate?: (status: string) => void,
-): Promise<{
-  walletClient: WalletClient
-  address: Address
-}> => {
+  onStatusUpdate?: (status: string) => void
+): Promise<{ address: Address; sessionId: string }> => {
   try {
-    // Connect to real Ledger device
-    const { address } = await connectRealLedger(onStatusUpdate)
-
-    // Create custom transport for Viem that uses real Ledger
-    const customTransport = custom({
-      async request({ method, params }) {
-        const manager = getLedgerManager()
-
-        switch (method) {
-          case "eth_accounts":
-          case "eth_requestAccounts":
-            return [address]
-
-          case "personal_sign": {
-            const [message, fromAddress] = params as [string, string]
-            if (fromAddress.toLowerCase() !== address.toLowerCase()) {
-              throw new Error("Address mismatch")
-            }
-
-            // Use real Ledger signing
-            return await signRealMessage(message, onStatusUpdate)
-          }
-
-          case "eth_sendTransaction": {
-            const [transaction] = params as [any]
-
-            try {
-              // In a real implementation, you would:
-              // 1. Build the raw transaction
-              // 2. Sign it with Ledger
-              // 3. Broadcast to network
-
-              onStatusUpdate?.("Please confirm transaction on your Ledger device...")
-
-              // For now, we'll throw an error since transaction signing needs more implementation
-              throw new Error("Transaction signing requires additional implementation")
-            } catch (error) {
-              throw error
-            }
-          }
-
-          default:
-            throw new Error(`Unsupported method: ${method}`)
-        }
-      },
-    })
-
-    const walletClient = createWalletClient({
-      chain: mainnet,
-      transport: customTransport,
-    })
-
-    return { walletClient, address: address as Address }
+    const result = await connectToLedger(onStatusUpdate)
+    return {
+      address: result.address as Address,
+      sessionId: result.sessionId
+    }
   } catch (error) {
-    console.error("Failed to connect to Ledger device:", error)
+    console.error("Error connecting to Ledger device:", error)
+    const friendlyMessage = handleLedgerError(error)
+    throw new Error(friendlyMessage)
+  }
+}
+
+// Disconnect Ledger device
+export const disconnectLedgerDevice = async (): Promise<void> => {
+  try {
+    await disconnectLedger()
+  } catch (error) {
+    console.error("Error disconnecting from Ledger device:", error)
     throw error
   }
 }
 
-// Disconnect real Ledger device
-export const disconnectLedgerDevice = async (): Promise<void> => {
-  await disconnectRealLedger()
-}
-
-// Sign welcome message with real Ledger
-export const signWelcomeMessage = async (
+// Sign welcome message with Rabby wallet
+export const signWelcomeMessageWithRabby = async (
   walletClient: WalletClient,
-  address: string,
-  onStatusUpdate?: (status: string) => void,
+  address: Address
 ): Promise<string> => {
-  const message = `Welcome to Pay-Peer-Roll! 🧻
-
-Please sign this message to authenticate your access to the payroll distribution system.
-
-Address: ${address}
-Timestamp: ${new Date().toISOString()}
-Nonce: ${Math.random().toString(36).substring(7)}
-
-By signing this message, you confirm your identity and agree to access the Pay-Peer-Roll dashboard.
-
-This signature will not trigger any blockchain transaction or cost any gas fees.`
-
   try {
-    onStatusUpdate?.("Preparing message for signing...")
-
     const signature = await walletClient.signMessage({
-      account: address as Address,
-      message,
+      account: address,
+      message: WELCOME_MESSAGE,
     })
-
     return signature
   } catch (error) {
-    console.error("Failed to sign message:", error)
+    console.error("Error signing message with Rabby wallet:", error)
     throw error
+  }
+}
+
+// Sign welcome message with Ledger device
+export const signWelcomeMessageWithLedger = async (
+  derivationPath: string = "44'/60'/0'/0/0",
+  onStatusUpdate?: (status: string) => void
+): Promise<string> => {
+  try {
+    const signature = await signMessageWithLedger(
+      WELCOME_MESSAGE,
+      derivationPath,
+      onStatusUpdate
+    )
+    return signature
+  } catch (error) {
+    console.error("Error signing message with Ledger device:", error)
+    const friendlyMessage = handleLedgerError(error)
+    throw new Error(friendlyMessage)
+  }
+}
+
+// Generic sign welcome message function
+export const signWelcomeMessage = async (
+  walletType: "rabby" | "ledger",
+  walletClient?: WalletClient,
+  address?: Address,
+  onStatusUpdate?: (status: string) => void
+): Promise<string> => {
+  if (walletType === "rabby") {
+    if (!walletClient || !address) {
+      throw new Error("Wallet client and address are required for Rabby wallet")
+    }
+    return signWelcomeMessageWithRabby(walletClient, address)
+  } else if (walletType === "ledger") {
+    return signWelcomeMessageWithLedger(undefined, onStatusUpdate)
+  } else {
+    throw new Error("Unsupported wallet type")
   }
 }
 

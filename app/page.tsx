@@ -17,7 +17,7 @@ export default function LandingPage() {
     walletType,
     connectRabby,
     connectLedger,
-    signAndAuthenticate,
+    signWelcomeMessageAndAuthenticate,
     ledgerStatus,
     ledgerInteraction,
   } = useWallet()
@@ -43,7 +43,7 @@ export default function LandingPage() {
 
   const handleSignAndEnter = async () => {
     try {
-      await signAndAuthenticate()
+      await signWelcomeMessageAndAuthenticate()
       setAuthStep("success")
       setTimeout(() => {
         router.push("/dashboard")
