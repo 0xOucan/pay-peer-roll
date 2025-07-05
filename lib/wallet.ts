@@ -4,11 +4,16 @@ import {
   connectToLedger, 
   signMessageWithLedger, 
   disconnectLedger, 
-  handleLedgerError 
+  handleLedgerError,
+  diagnosticDeviceState,
+  testLedgerSetup 
 } from "./ledger-integration"
 
 // Welcome message for Pay-Peer-Roll app
 const WELCOME_MESSAGE = "Welcome to Pay-Peer-Roll App 🧻💸 Private payrolls, crystal-clear approvals."
+
+// Simple fallback message without emojis for testing
+const SIMPLE_WELCOME_MESSAGE = "Welcome to Pay-Peer-Roll App"
 
 // Rabby wallet connection (unchanged)
 export const connectRabbyWallet = async (): Promise<WalletClient | null> => {
@@ -118,6 +123,34 @@ export const signWelcomeMessage = async (
     return signWelcomeMessageWithLedger(undefined, onStatusUpdate)
   } else {
     throw new Error("Unsupported wallet type")
+  }
+}
+
+// Diagnostic function for debugging
+export const getLedgerDiagnostics = async () => {
+  return await diagnosticDeviceState()
+}
+
+// Test function for debugging
+export const testLedgerConnection = async () => {
+  return await testLedgerSetup()
+}
+
+// Test signing with simple message
+export const testSimpleLedgerSigning = async (
+  onStatusUpdate?: (status: string) => void
+): Promise<string> => {
+  try {
+    const signature = await signMessageWithLedger(
+      SIMPLE_WELCOME_MESSAGE,
+      "44'/60'/0'/0/0",
+      onStatusUpdate
+    )
+    return signature
+  } catch (error) {
+    console.error("Error signing simple message with Ledger device:", error)
+    const friendlyMessage = handleLedgerError(error)
+    throw new Error(friendlyMessage)
   }
 }
 
