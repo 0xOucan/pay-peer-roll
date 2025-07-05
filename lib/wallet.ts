@@ -54,11 +54,11 @@ export const connectLedgerDevice = async (
       address: result.address as Address,
       sessionId: result.sessionId
     }
-  } catch (error) {
+            } catch (error) {
     console.error("Error connecting to Ledger device:", error)
     const friendlyMessage = handleLedgerError(error)
     throw new Error(friendlyMessage)
-  }
+        }
 }
 
 // Disconnect Ledger device

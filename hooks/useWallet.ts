@@ -110,8 +110,8 @@ export const useWallet = () => {
 
   const connectLedger = useCallback(async () => {
     setWalletState(prev => ({ 
-      ...prev, 
-      isConnecting: true, 
+      ...prev,
+      isConnecting: true,
       error: null,
       ledgerStatus: "Initializing...",
       ledgerInteraction: null,

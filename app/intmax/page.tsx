@@ -31,6 +31,13 @@ interface RecipientAddress {
   isValid: boolean
 }
 
+interface IntmaxRecipient {
+  id: string
+  address: string
+  amount: string
+  isValid: boolean
+}
+
 export default function IntmaxPage() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState("deposit")
@@ -58,6 +65,13 @@ export default function IntmaxPage() {
   ])
   const [multiSendToken, setMultiSendToken] = useState("ETH")
   const [totalAmount, setTotalAmount] = useState("0")
+  
+  // INTMAX transfer state
+  const [intmaxRecipients, setIntmaxRecipients] = useState<IntmaxRecipient[]>([
+    { id: "1", address: "", amount: "", isValid: false }
+  ])
+  const [intmaxTransferToken, setIntmaxTransferToken] = useState("ETH")
+  const [intmaxTotalAmount, setIntmaxTotalAmount] = useState("0")
 
   // Clear messages
   const clearMessages = () => {
@@ -68,6 +82,11 @@ export default function IntmaxPage() {
   // Validate Ethereum address
   const isValidAddress = (address: string): boolean => {
     return /^0x[a-fA-F0-9]{40}$/.test(address)
+  }
+  
+  // Validate INTMAX address
+  const isValidIntmaxAddress = (address: string): boolean => {
+    return address.startsWith('T') && address.length > 50
   }
 
   // Add recipient
@@ -97,6 +116,33 @@ export default function IntmaxPage() {
     }))
   }
 
+  // Add INTMAX recipient
+  const addIntmaxRecipient = () => {
+    const newId = (intmaxRecipients.length + 1).toString()
+    setIntmaxRecipients([...intmaxRecipients, { id: newId, address: "", amount: "", isValid: false }])
+  }
+
+  // Remove INTMAX recipient
+  const removeIntmaxRecipient = (id: string) => {
+    if (intmaxRecipients.length > 1) {
+      setIntmaxRecipients(intmaxRecipients.filter(r => r.id !== id))
+    }
+  }
+
+  // Update INTMAX recipient
+  const updateIntmaxRecipient = (id: string, field: 'address' | 'amount', value: string) => {
+    setIntmaxRecipients(intmaxRecipients.map(r => {
+      if (r.id === id) {
+        const updated = { ...r, [field]: value }
+        if (field === 'address') {
+          updated.isValid = isValidIntmaxAddress(value)
+        }
+        return updated
+      }
+      return r
+    }))
+  }
+
   // Calculate total amount
   useEffect(() => {
     const total = recipients.reduce((sum, r) => {
@@ -105,6 +151,15 @@ export default function IntmaxPage() {
     }, 0)
     setTotalAmount(total.toString())
   }, [recipients])
+  
+  // Calculate INTMAX total amount
+  useEffect(() => {
+    const total = intmaxRecipients.reduce((sum, r) => {
+      const amount = parseFloat(r.amount) || 0
+      return sum + amount
+    }, 0)
+    setIntmaxTotalAmount(total.toString())
+  }, [intmaxRecipients])
 
   // INTMAX Client operations
   const loginToIntmax = async () => {
@@ -285,6 +340,49 @@ export default function IntmaxPage() {
     }
   }
 
+  const handleIntmaxTransfer = async () => {
+    const validRecipients = intmaxRecipients.filter(r => r.isValid && r.amount && parseFloat(r.amount) > 0)
+    
+    if (validRecipients.length === 0) {
+      setError('Please add at least one valid INTMAX recipient with amount')
+      return
+    }
+
+    setIsLoading(true)
+    clearMessages()
+    
+    try {
+      const response = await fetch('/api/intmax/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipients: validRecipients.map(r => ({
+            address: r.address,
+            amount: r.amount
+          })),
+          token: intmaxTransferToken,
+          tokenAddress: intmaxTransferToken === 'USDC' ? USDC_SEPOLIA_ADDRESS : null
+        })
+      })
+      
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'INTMAX transfer failed')
+      }
+      
+      setSuccess(`INTMAX transfer successful! ${data.transactions.length} transactions completed with privacy mixing`)
+      setIntmaxRecipients([{ id: "1", address: "", amount: "", isValid: false }])
+      
+      // Refresh balances
+      await refreshBalances()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'INTMAX transfer failed')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const refreshBalances = async () => {
     try {
       const response = await fetch('/api/intmax/balances')
@@ -427,10 +525,11 @@ export default function IntmaxPage() {
               {/* Main Functionality */}
               {isLoggedIn && (
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid w-full grid-cols-3 bg-[#C0C0C0]">
+                  <TabsList className="grid w-full grid-cols-4 bg-[#C0C0C0]">
                     <TabsTrigger value="deposit" className="text-black">💳 Deposit</TabsTrigger>
                     <TabsTrigger value="withdraw" className="text-black">💸 Withdraw</TabsTrigger>
                     <TabsTrigger value="multi-send" className="text-black">🚀 Multi-Send</TabsTrigger>
+                    <TabsTrigger value="intmax-transfer" className="text-black">🔄 INTMAX Transfer</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="deposit" className="space-y-4">
@@ -616,6 +715,102 @@ export default function IntmaxPage() {
                           className="w-full bg-[#0000FF] text-white hover:bg-[#000080]"
                         >
                           {isLoading ? "Processing..." : `Send ${multiSendToken} to ${recipients.filter(r => r.isValid && r.amount).length} Recipients`}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="intmax-transfer" className="space-y-4">
+                    <Card className="bg-[#E0E0E0] border-2 border-inset">
+                      <CardHeader>
+                        <CardTitle className="text-black">INTMAX-to-INTMAX Transfer</CardTitle>
+                        <CardDescription className="text-gray-600">
+                          Transfer tokens between INTMAX addresses with privacy mixing
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div>
+                          <Label className="text-black">Token</Label>
+                          <Select value={intmaxTransferToken} onValueChange={setIntmaxTransferToken}>
+                            <SelectTrigger className="bg-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ETH">ETH (Native)</SelectItem>
+                              <SelectItem value="USDC">USDC</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <Separator />
+                        
+                        <div>
+                          <div className="flex justify-between items-center mb-2">
+                            <Label className="text-black">INTMAX Recipients</Label>
+                            <Button 
+                              onClick={addIntmaxRecipient}
+                              size="sm"
+                              className="bg-[#0000FF] text-white hover:bg-[#000080]"
+                            >
+                              + Add Recipient
+                            </Button>
+                          </div>
+                          
+                          {intmaxRecipients.map((recipient, index) => (
+                            <div key={recipient.id} className="grid grid-cols-12 gap-2 mb-2">
+                              <div className="col-span-8">
+                                <Input
+                                  placeholder="T..."
+                                  value={recipient.address}
+                                  onChange={(e) => updateIntmaxRecipient(recipient.id, 'address', e.target.value)}
+                                  className={`bg-white font-mono text-xs ${recipient.address && !recipient.isValid ? 'border-red-500' : ''}`}
+                                />
+                                {recipient.address && !recipient.isValid && (
+                                  <p className="text-red-500 text-xs mt-1">Invalid INTMAX address</p>
+                                )}
+                              </div>
+                              <div className="col-span-3">
+                                <Input
+                                  type="number"
+                                  step="0.000001"
+                                  placeholder="0.0"
+                                  value={recipient.amount}
+                                  onChange={(e) => updateIntmaxRecipient(recipient.id, 'amount', e.target.value)}
+                                  className="bg-white"
+                                />
+                              </div>
+                              <div className="col-span-1">
+                                <Button
+                                  onClick={() => removeIntmaxRecipient(recipient.id)}
+                                  disabled={intmaxRecipients.length === 1}
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full bg-[#C0C0C0] text-black hover:bg-[#E0E0E0]"
+                                >
+                                  ×
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        
+                        <div className="bg-white p-3 rounded border">
+                          <div className="flex justify-between text-sm">
+                            <span>Total Amount:</span>
+                            <span className="font-bold">{intmaxTotalAmount} {intmaxTransferToken}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Recipients:</span>
+                            <span>{intmaxRecipients.filter(r => r.isValid && r.amount).length}</span>
+                          </div>
+                        </div>
+                        
+                        <Button 
+                          onClick={handleIntmaxTransfer} 
+                          disabled={isLoading || intmaxRecipients.filter(r => r.isValid && r.amount).length === 0}
+                          className="w-full bg-[#0000FF] text-white hover:bg-[#000080]"
+                        >
+                          {isLoading ? "Processing..." : `Transfer ${intmaxTransferToken} to ${intmaxRecipients.filter(r => r.isValid && r.amount).length} INTMAX Address(es)`}
                         </Button>
                       </CardContent>
                     </Card>
