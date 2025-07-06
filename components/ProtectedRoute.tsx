@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import { checkStoredAuthentication } from "@/lib/wallet"
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -11,31 +12,26 @@ interface ProtectedRouteProps {
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
+  const [authInfo, setAuthInfo] = useState<string>("")
   const router = useRouter()
 
   useEffect(() => {
     const checkAuth = () => {
-      const authData = localStorage.getItem("payroll_auth")
-
-      if (!authData) {
-        setIsAuthenticated(false)
-        router.push("/")
-        return
-      }
-
       try {
-        const { timestamp } = JSON.parse(authData)
-        // Check if auth is less than 24 hours old
-        if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
+        const authStatus = checkStoredAuthentication()
+        
+        if (authStatus.isAuthenticated) {
           setIsAuthenticated(true)
+          setAuthInfo(`Authenticated as ${authStatus.address?.slice(0, 6)}...${authStatus.address?.slice(-4)} (${authStatus.walletType})`)
         } else {
-          localStorage.removeItem("payroll_auth")
           setIsAuthenticated(false)
+          setAuthInfo("No valid authentication found")
           router.push("/")
         }
       } catch (error) {
-        localStorage.removeItem("payroll_auth")
+        console.error("Authentication check failed:", error)
         setIsAuthenticated(false)
+        setAuthInfo("Authentication check failed")
         router.push("/")
       }
     }
@@ -47,15 +43,28 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     return (
       <div className="min-h-screen bg-[#008080] flex items-center justify-center">
         <div className="bg-[#C0C0C0] border-2 border-inset p-8 text-center">
-          <div className="text-2xl mb-4">🔄</div>
-          <div className="text-black font-bold">Checking authentication...</div>
+          <div className="text-2xl mb-4 animate-pulse">🔍</div>
+          <div className="text-black font-bold mb-2">Checking authentication...</div>
+          <div className="text-xs text-gray-600">{authInfo}</div>
+          <div className="mt-4 bg-white border-2 border-inset p-2">
+            <div className="bg-blue-600 h-2 animate-pulse"></div>
+          </div>
         </div>
       </div>
     )
   }
 
   if (!isAuthenticated) {
-    return null // Will redirect to login
+    return (
+      <div className="min-h-screen bg-[#008080] flex items-center justify-center">
+        <div className="bg-[#C0C0C0] border-2 border-inset p-8 text-center">
+          <div className="text-2xl mb-4">⚠️</div>
+          <div className="text-black font-bold mb-2">Authentication Required</div>
+          <div className="text-xs text-gray-600 mb-4">{authInfo}</div>
+          <div className="text-sm text-black">Redirecting to login...</div>
+        </div>
+      </div>
+    )
   }
 
   return <>{children}</>

@@ -3,9 +3,15 @@
 import { useState } from "react"
 import Link from "next/link"
 import ProtectedRoute from "@/components/ProtectedRoute"
+import { clearStoredAuthentication } from "@/lib/wallet"
 
 export default function Dashboard() {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
+
+  const handleLogout = () => {
+    clearStoredAuthentication()
+    window.location.href = "/"
+  }
 
   const applications = [
     {
@@ -83,10 +89,7 @@ export default function Dashboard() {
               </div>
               <div className="flex space-x-1">
                 <button
-                  onClick={() => {
-                    localStorage.removeItem("payroll_auth")
-                    window.location.href = "/"
-                  }}
+                  onClick={handleLogout}
                   className="w-4 h-4 bg-[#C0C0C0] border border-t-white border-l-white border-r-[#808080] border-b-[#808080] text-xs hover:bg-[#E0E0E0]"
                   title="Logout"
                 >

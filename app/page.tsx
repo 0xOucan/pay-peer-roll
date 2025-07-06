@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useWallet } from "@/hooks/useWallet"
+import { checkStoredAuthentication } from "@/lib/wallet"
 
 export default function LandingPage() {
   const [isHovered, setIsHovered] = useState(false)
   const [authStep, setAuthStep] = useState<"connect" | "sign" | "success">("connect")
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const router = useRouter()
 
   const {
@@ -21,6 +23,30 @@ export default function LandingPage() {
     ledgerStatus,
     ledgerInteraction,
   } = useWallet()
+
+  // Check for existing authentication on page load
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const authStatus = checkStoredAuthentication()
+        
+        if (authStatus.isAuthenticated) {
+          console.log("User already authenticated, redirecting to dashboard...")
+          setAuthStep("success")
+          setTimeout(() => {
+            router.push("/dashboard")
+          }, 1000)
+        } else {
+          setIsCheckingAuth(false)
+        }
+      } catch (error) {
+        console.error("Error checking authentication:", error)
+        setIsCheckingAuth(false)
+      }
+    }
+
+    checkAuth()
+  }, [router])
 
   const handleRabbyConnect = async () => {
     try {
@@ -109,8 +135,22 @@ export default function LandingPage() {
             {/* Authentication Panel */}
             <div className="max-w-md mx-auto">
               <div className="bg-[#C0C0C0] border-2 border-inset p-6">
+                {/* Checking Authentication State */}
+                {isCheckingAuth && (
+                  <div className="text-center">
+                    <div className="w-16 h-16 bg-[#C0C0C0] border-2 border-inset mx-auto mb-4 flex items-center justify-center">
+                      <span className="text-2xl animate-pulse">🔍</span>
+                    </div>
+                    <h2 className="text-xl font-bold text-black mb-2">Checking Authentication</h2>
+                    <p className="text-sm text-black mb-4">Please wait while we check your login status...</p>
+                    <div className="bg-white border-2 border-inset p-2">
+                      <div className="bg-blue-600 h-4 animate-pulse"></div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Step 1: Connect Wallet */}
-                {authStep === "connect" && (
+                {!isCheckingAuth && authStep === "connect" && (
                   <>
                     <div className="text-center mb-6">
                       <div className="w-16 h-16 bg-[#C0C0C0] border-2 border-inset mx-auto mb-4 flex items-center justify-center">
@@ -157,7 +197,7 @@ export default function LandingPage() {
                 )}
 
                 {/* Step 2: Sign Message */}
-                {authStep === "sign" && isConnected && (
+                {!isCheckingAuth && authStep === "sign" && isConnected && (
                   <>
                     <div className="text-center mb-6">
                       <div className="w-16 h-16 bg-[#C0C0C0] border-2 border-inset mx-auto mb-4 flex items-center justify-center">
@@ -252,7 +292,7 @@ export default function LandingPage() {
                 )}
 
                 {/* Error Display */}
-                {error && (
+                {!isCheckingAuth && error && (
                   <div className="mt-4 bg-red-100 border-2 border-inset p-3">
                     <div className="text-sm text-red-800 font-bold">⚠️ Error:</div>
                     <div className="text-xs text-red-600">{error}</div>
@@ -269,7 +309,9 @@ export default function LandingPage() {
                   <span>🔒 Secure Authentication</span>
                   <span>⛓️ Blockchain Ready</span>
                 </div>
-                <div>{authStep === "connect" ? "Ready" : authStep === "sign" ? "Signing" : "Success"}</div>
+                <div>
+                  {isCheckingAuth ? "Checking..." : authStep === "connect" ? "Ready" : authStep === "sign" ? "Signing" : "Success"}
+                </div>
               </div>
             </div>
           </div>
