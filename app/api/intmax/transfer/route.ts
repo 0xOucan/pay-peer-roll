@@ -49,31 +49,38 @@ export async function POST(request: NextRequest) {
     console.log(`Initiating INTMAX transfer: ${recipients.length} recipients for ${token}`)
     const client = await getIntmaxClient()
     
-    // Get token information from balances (more complete than tokens list)
-    const balances = await client.fetchTokenBalances()
-    const tokensList = await client.getTokensList()
+    // Get both tokens list and balances for complete token information
+    const [tokensList, { balances }] = await Promise.all([
+      client.getTokensList(),
+      client.fetchTokenBalances()
+    ])
     
     console.log('Available balances:', balances)
     console.log('Available tokens:', tokensList)
     console.log('Looking for token:', token)
     
     // Find the token - prioritize balance data as it has complete information
-    let targetToken = balances.find((b: any) => {
+    let targetToken = null
+    
+    // First, try to find in balances (has complete token info including tokenType)
+    const balanceEntry = balances.find((b: any) => {
+      const balanceToken = b.token
       if (token === 'ETH') {
-        return (
-          b.tokenType === 0 || 
-          b.symbol === 'ETH' || 
-          b.contractAddress === '0x0000000000000000000000000000000000000000'
-        )
+        return balanceToken.symbol === 'ETH' || 
+               balanceToken.tokenType === 0 ||
+               balanceToken.contractAddress === '0x0000000000000000000000000000000000000000'
       }
       if (token === 'USDC' && tokenAddress) {
-        return b.contractAddress?.toLowerCase() === tokenAddress.toLowerCase()
+        return balanceToken.contractAddress?.toLowerCase() === tokenAddress.toLowerCase()
       }
-      return b.symbol?.toLowerCase() === token.toLowerCase()
+      return balanceToken.symbol?.toLowerCase() === token.toLowerCase()
     })
-
-    // Fallback to tokens list if not found in balances
-    if (!targetToken) {
+    
+    if (balanceEntry) {
+      targetToken = balanceEntry.token
+      console.log('Found token in balances:', targetToken)
+    } else {
+      // Fallback to tokens list
       targetToken = tokensList.find((t: any) => {
         if (token === 'ETH') {
           return (
@@ -87,6 +94,10 @@ export async function POST(request: NextRequest) {
         }
         return t.symbol?.toLowerCase() === token.toLowerCase()
       })
+      
+      if (targetToken) {
+        console.log('Found token in tokens list:', targetToken)
+      }
     }
     
     if (!targetToken) {
@@ -95,10 +106,16 @@ export async function POST(request: NextRequest) {
         tokenType: t.tokenType, 
         contractAddress: t.contractAddress 
       })))
+      console.log('Available balances:', balances.map((b: any) => ({
+        symbol: b.token.symbol,
+        tokenType: b.token.tokenType,
+        contractAddress: b.token.contractAddress
+      })))
       return NextResponse.json(
         { 
           error: `Token ${token} not found in available tokens list`,
-          availableTokens: tokensList.map((t: any) => t.symbol).filter(Boolean)
+          availableTokens: tokensList.map((t: any) => t.symbol).filter(Boolean),
+          availableBalances: balances.map((b: any) => b.token.symbol).filter(Boolean)
         },
         { status: 400 }
       )
@@ -106,22 +123,20 @@ export async function POST(request: NextRequest) {
 
     console.log('Using token:', targetToken)
 
-    // Ensure tokenType is set (default to 0 for ETH if missing)
-    if (targetToken.tokenType === undefined) {
-      targetToken.tokenType = 0
+    // Prepare token object according to INTMAX SDK requirements
+    const transferToken = {
+      tokenType: targetToken.tokenType ?? (token === 'ETH' ? 0 : 1), // Default to 0 for ETH, 1 for ERC20
+      tokenIndex: targetToken.tokenIndex || 0,
+      decimals: targetToken.decimals || 18,
+      contractAddress: targetToken.contractAddress || "0x0000000000000000000000000000000000000000",
+      price: targetToken.price || 0
     }
     
     // Prepare broadcast transaction requests for INTMAX addresses
     const broadcastRequests = recipients.map(recipient => ({
       address: recipient.address, // INTMAX address
-      amount: parseFloat(recipient.amount),
-      token: {
-        tokenType: targetToken.tokenType,
-        tokenIndex: targetToken.tokenIndex || 0,
-        decimals: targetToken.decimals || 18,
-        contractAddress: targetToken.contractAddress || "0x0000000000000000000000000000000000000000",
-        price: targetToken.price || 0
-      }
+      amount: parseFloat(recipient.amount), // Use decimal amount as per SDK docs
+      token: transferToken
     }))
     
     console.log('Broadcasting transactions:', broadcastRequests)

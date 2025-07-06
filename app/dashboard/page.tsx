@@ -40,6 +40,14 @@ export default function Dashboard() {
       icon: "🔒",
       href: "/intmax",
     },
+    {
+      id: "intmax-client",
+      title: "INTMAX Client SDK",
+      subtitle: "🚀 Frontend Integration",
+      description: "Direct client-side INTMAX integration",
+      icon: "🖥️",
+      href: "/intmax-client",
+    },
   ]
 
   return (

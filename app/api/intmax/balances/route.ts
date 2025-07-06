@@ -13,12 +13,38 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({
       success: true,
-      balances: balances.map((balance: any) => ({
-        token: balance.token,
-        balance: balance.amount.toString(),
-        symbol: balance.token.symbol || 'Unknown',
-        decimals: balance.token.decimals || 18
-      }))
+      balances: balances.map((balance: any) => {
+        const tokenDecimals = balance.token.decimals || 18
+        const rawAmount = balance.amount
+        
+        // Convert BigInt to decimal string for display
+        let formattedBalance = '0'
+        if (rawAmount && rawAmount !== BigInt(0)) {
+          // Convert BigInt to decimal format
+          const divisor = BigInt('1' + '0'.repeat(tokenDecimals))
+          const wholePart = rawAmount / divisor
+          const fractionalPart = rawAmount % divisor
+          
+          if (fractionalPart === BigInt(0)) {
+            formattedBalance = wholePart.toString()
+          } else {
+            // Format fractional part with proper decimal places
+            const fractionalStr = fractionalPart.toString().padStart(tokenDecimals, '0')
+            // Remove trailing zeros
+            const trimmedFractional = fractionalStr.replace(/0+$/, '')
+            formattedBalance = trimmedFractional ? 
+              `${wholePart}.${trimmedFractional}` : 
+              wholePart.toString()
+          }
+        }
+        
+        return {
+          token: balance.token,
+          balance: formattedBalance,
+          symbol: balance.token.symbol || 'Unknown',
+          decimals: tokenDecimals
+        }
+      })
     })
   } catch (error) {
     console.error('INTMAX balances error:', error)
