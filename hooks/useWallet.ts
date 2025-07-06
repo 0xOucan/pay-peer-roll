@@ -193,6 +193,15 @@ export const useWallet = () => {
         } : undefined
       )
 
+      // Save authentication to localStorage
+      const authData = {
+        timestamp: Date.now(),
+        address: walletState.address,
+        walletType: walletState.walletType,
+        signature: signature
+      }
+      localStorage.setItem("payroll_auth", JSON.stringify(authData))
+
       setWalletState(prev => ({
         ...prev,
         isConnecting: false,
@@ -225,6 +234,9 @@ export const useWallet = () => {
     } catch (error) {
       console.error("Error during disconnect:", error)
     }
+
+    // Clear authentication from localStorage
+    localStorage.removeItem("payroll_auth")
 
     setWalletState({
       isConnected: false,

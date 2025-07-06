@@ -62,6 +62,17 @@ export const connectToLedger = async (
   sessionId: string;
 }> => {
   try {
+    // Check if we're in a production environment
+    const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && !window.location.hostname.includes('127.0.0.1');
+    
+    if (isProduction) {
+      console.log('🌐 Running in production environment');
+      // Check if Web HID is available
+      if (!navigator.hid) {
+        throw new Error("Web HID API is not available in this browser/environment. Please use Chrome or Edge on HTTPS.");
+      }
+    }
+
     if (!dmk) {
       onStatusUpdate?.("Initializing Ledger DMK...");
       await initializeLedgerDMK();
@@ -73,62 +84,53 @@ export const connectToLedger = async (
 
     onStatusUpdate?.("Discovering Ledger devices...");
     
-    // Enhanced device discovery with better error handling
+    // First discover devices
     return new Promise((resolve, reject) => {
       let timeoutId: NodeJS.Timeout;
       let discoverySubscription: any;
-      let deviceFound = false;
       
-      try {
-        const discoveryObservable = dmk!.startDiscovering({});
-        
-        discoverySubscription = discoveryObservable.subscribe({
-          next: (device: any) => {
-            if (deviceFound) return; // Prevent multiple connections
-            deviceFound = true;
-            
-            console.log("Discovered device:", device);
-            
-            // Stop discovery first
-            if (discoverySubscription) {
-              discoverySubscription.unsubscribe();
+      const discoveryObservable = dmk!.startDiscovering({});
+      
+      discoverySubscription = discoveryObservable.subscribe({
+        next: (device: any) => {
+          console.log("Discovered device:", device);
+          
+          // Automatically connect to the first discovered device
+          connectToDiscoveredDevice(device, onStatusUpdate, resolve, reject);
+          clearTimeout(timeoutId);
+          discoverySubscription.unsubscribe();
+        },
+        error: (error: Error) => {
+          console.error("Device discovery error:", error);
+          clearTimeout(timeoutId);
+          
+          // Provide more specific error messages for production
+          if (isProduction) {
+            if (error.message.includes('HID')) {
+              reject(new Error("HID access denied. Please ensure you're using HTTPS and have granted HID permissions."));
+            } else if (error.message.includes('device')) {
+              reject(new Error("No Ledger device found. Please connect your Ledger device and ensure it's unlocked."));
+            } else {
+              reject(new Error(`Ledger connection failed: ${error.message}`));
             }
-            clearTimeout(timeoutId);
-            
-            // Connect to the discovered device
-            connectToDiscoveredDevice(device, onStatusUpdate)
-              .then(resolve)
-              .catch(reject);
-          },
-          error: (error: any) => {
-            console.error("Device discovery error:", error);
-            clearTimeout(timeoutId);
-            
-            const errorMessage = handleLedgerError(error);
-            reject(new Error(`Device discovery failed: ${errorMessage}`));
+          } else {
+            reject(error);
           }
-        });
-        
-        // Set timeout for discovery
-        timeoutId = setTimeout(() => {
-          if (discoverySubscription) {
-            discoverySubscription.unsubscribe();
-          }
-          if (!deviceFound) {
-            reject(new Error("No Ledger devices found. Please ensure your device is connected, unlocked, and the Ethereum app is open."));
-          }
-        }, 15000); // 15 seconds timeout
-        
-      } catch (error) {
-        console.error("Error starting device discovery:", error);
-        const errorMessage = handleLedgerError(error);
-        reject(new Error(`Failed to start device discovery: ${errorMessage}`));
-      }
+        }
+      });
+      
+      // Set timeout for discovery
+      timeoutId = setTimeout(() => {
+        discoverySubscription.unsubscribe();
+        const errorMessage = isProduction 
+          ? "No Ledger devices found. Please ensure your device is connected, unlocked, and the Ethereum app is open."
+          : "No Ledger devices found. Please ensure your device is connected and unlocked.";
+        reject(new Error(errorMessage));
+      }, 10000); // 10 seconds timeout
     });
   } catch (error) {
     console.error("Failed to connect to Ledger:", error);
-    const errorMessage = handleLedgerError(error);
-    throw new Error(errorMessage);
+    throw error;
   }
 };
 
@@ -137,112 +139,111 @@ export const connectToLedger = async (
  */
 const connectToDiscoveredDevice = async (
   device: any,
-  onStatusUpdate?: (status: string) => void
-): Promise<{ address: string; sessionId: string }> => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      if (!dmk) {
-        throw new Error("DeviceManagementKit not initialized");
-      }
-
-      onStatusUpdate?.("Connecting to Ledger device...");
-      
-      // Connect to device and get session ID
-      const newSessionId = await dmk.connect({ device });
-      sessionId = newSessionId;
-      
-      // Create the Ethereum signer
-      onStatusUpdate?.("Creating Ethereum signer...");
-      const contextModule = new ContextModuleBuilder({
-        originToken: "pay-peer-roll-app" // Your app's origin token
-      }).build();
-      
-      signerEth = new SignerEthBuilder({
-        dmk,
-        sessionId: newSessionId,
-      }).withContextModule(contextModule).build();
-      
-      // Get address from device using standard derivation path
-      onStatusUpdate?.("Getting Ethereum address...");
-      const derivationPath = "44'/60'/0'/0/0"; // Standard Ethereum derivation path
-      
-      if (!signerEth) {
-        reject(new Error("Failed to create Ethereum signer"));
-        return;
-      }
-      
-      const { observable, cancel } = signerEth.getAddress(derivationPath, {
-        checkOnDevice: true, // This will display the address on the device for verification
-      });
-      
-      let timeoutId: NodeJS.Timeout;
-      
-      const subscription = observable.subscribe({
-        next: (state: any) => {
-          switch (state.status) {
-            case DeviceActionStatus.NotStarted:
-              onStatusUpdate?.("Initializing address retrieval...");
-              break;
-              
-            case DeviceActionStatus.Pending:
-              const { requiredUserInteraction } = state.intermediateValue || {};
-              
-              switch (requiredUserInteraction) {
-                case UserInteractionRequired.UnlockDevice:
-                  onStatusUpdate?.("Please unlock your Ledger device");
-                  break;
-                case UserInteractionRequired.ConfirmOpenApp:
-                  onStatusUpdate?.("Please open the Ethereum app on your Ledger");
-                  break;
-                case UserInteractionRequired.VerifyAddress:
-                  onStatusUpdate?.("Please verify the address on your Ledger screen");
-                  break;
-                default:
-                  onStatusUpdate?.("Waiting for device interaction...");
-              }
-              break;
-              
-            case DeviceActionStatus.Completed:
-              const { address } = state.output;
-              onStatusUpdate?.(`Address retrieved: ${address}`);
-              clearTimeout(timeoutId);
-              subscription.unsubscribe();
-              resolve({ address, sessionId: newSessionId });
-              break;
-              
-            case DeviceActionStatus.Error:
-              clearTimeout(timeoutId);
-              subscription.unsubscribe();
-              const errorMessage = state.error?.message || state.error?.toString() || "Unknown error occurred";
-              reject(new Error(errorMessage));
-              break;
-            
-            case DeviceActionStatus.Stopped:
-              clearTimeout(timeoutId);
-              subscription.unsubscribe();
-              reject(new Error("Operation was cancelled"));
-              break;
-          }
-        },
-        error: (error: Error) => {
-          clearTimeout(timeoutId);
-          onStatusUpdate?.(`Error: ${error.message}`);
-          reject(error);
-        },
-      });
-      
-      // Set a timeout to prevent hanging forever
-      timeoutId = setTimeout(() => {
-        subscription.unsubscribe();
-        cancel();
-        reject(new Error("Operation timed out. Please try again."));
-      }, 120000); // 2 minutes timeout
-      
-    } catch (error) {
-      console.error("Failed to connect to discovered device:", error);
-      reject(error);
+  onStatusUpdate?: (status: string) => void,
+  resolve?: (value: { address: string; sessionId: string }) => void,
+  reject?: (reason?: any) => void
+): Promise<void> => {
+  try {
+    if (!dmk) {
+      throw new Error("DeviceManagementKit not initialized");
     }
-  });
+
+    onStatusUpdate?.("Connecting to Ledger device...");
+    // Connect to device and get session ID
+    const newSessionId = await dmk.connect({ device });
+    sessionId = newSessionId;
+    
+    // Create the Ethereum signer
+    onStatusUpdate?.("Creating Ethereum signer...");
+    const contextModule = new ContextModuleBuilder({
+      originToken: "pay-peer-roll-app" // Your app's origin token
+    }).build();
+    
+    signerEth = new SignerEthBuilder({
+      dmk,
+      sessionId: newSessionId,
+    }).withContextModule(contextModule).build();
+    
+    // Get address from device using standard derivation path
+    onStatusUpdate?.("Getting Ethereum address...");
+    const derivationPath = "44'/60'/0'/0/0"; // Standard Ethereum derivation path
+    
+    if (!signerEth) {
+      reject?.(new Error("Failed to create Ethereum signer"));
+      return;
+    }
+    
+    const { observable, cancel } = signerEth.getAddress(derivationPath, {
+      checkOnDevice: true, // This will display the address on the device for verification
+    });
+    
+    let timeoutId: NodeJS.Timeout;
+    
+    const subscription = observable.subscribe({
+      next: (state: any) => {
+        switch (state.status) {
+          case DeviceActionStatus.NotStarted:
+            onStatusUpdate?.("Initializing address retrieval...");
+            break;
+            
+          case DeviceActionStatus.Pending:
+            const { requiredUserInteraction } = state.intermediateValue || {};
+            
+            switch (requiredUserInteraction) {
+              case UserInteractionRequired.UnlockDevice:
+                onStatusUpdate?.("Please unlock your Ledger device");
+                break;
+              case UserInteractionRequired.ConfirmOpenApp:
+                onStatusUpdate?.("Please open the Ethereum app on your Ledger");
+                break;
+              case UserInteractionRequired.VerifyAddress:
+                onStatusUpdate?.("Please verify the address on your Ledger screen");
+                break;
+              default:
+                onStatusUpdate?.("Waiting for device interaction...");
+            }
+            break;
+            
+          case DeviceActionStatus.Completed:
+            const { address } = state.output;
+            onStatusUpdate?.(`Address retrieved: ${address}`);
+            clearTimeout(timeoutId);
+            subscription.unsubscribe();
+            resolve?.({ address, sessionId: newSessionId });
+            break;
+            
+          case DeviceActionStatus.Error:
+            clearTimeout(timeoutId);
+            subscription.unsubscribe();
+            const errorMessage = state.error?.message || state.error?.toString() || "Unknown error occurred";
+            reject?.(new Error(errorMessage));
+            break;
+            
+          case DeviceActionStatus.Stopped:
+            clearTimeout(timeoutId);
+            subscription.unsubscribe();
+            reject?.(new Error("Operation was cancelled"));
+            break;
+        }
+      },
+      error: (error: Error) => {
+        clearTimeout(timeoutId);
+        onStatusUpdate?.(`Error: ${error.message}`);
+        reject?.(error);
+      },
+    });
+    
+    // Set timeout for address retrieval
+    timeoutId = setTimeout(() => {
+      subscription.unsubscribe();
+      cancel();
+      reject?.(new Error("Operation timed out. Please try again."));
+    }, 120000); // 2 minutes timeout
+    
+  } catch (error) {
+    console.error("Failed to connect to discovered device:", error);
+    reject?.(error);
+  }
 };
 
 /**
