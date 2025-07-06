@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { useWallet } from "@/hooks/useWallet"
+import ProductionDebugger from "@/components/ProductionDebugger"
 
 export default function LandingPage() {
   const [isHovered, setIsHovered] = useState(false)
@@ -275,6 +276,9 @@ export default function LandingPage() {
           </div>
         </div>
       </div>
+      
+      {/* Production Debugger */}
+      <ProductionDebugger />
     </div>
   )
 }
