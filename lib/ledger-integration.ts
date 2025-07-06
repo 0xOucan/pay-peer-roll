@@ -57,7 +57,7 @@ export const initializeLedgerDMK = async (): Promise<void> => {
  */
 export const connectToLedger = async (
   onStatusUpdate?: (status: string) => void
-): Promise<{
+  ): Promise<{
   address: string;
   sessionId: string;
 }> => {
@@ -119,7 +119,7 @@ export const connectToLedger = async (
           }
         }, 15000); // 15 seconds timeout
         
-      } catch (error) {
+    } catch (error) {
         console.error("Error starting device discovery:", error);
         const errorMessage = handleLedgerError(error);
         reject(new Error(`Failed to start device discovery: ${errorMessage}`));
@@ -442,17 +442,8 @@ export const signMessageWithLedger = async (
         // Try different message formats - some Ledger apps might have issues with emojis
         let messageToSign = message;
         
-        // Check if message contains emojis or special characters that might cause issues
-        const hasEmojis = /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u.test(message);
-        
-        if (hasEmojis) {
-          console.log("Message contains emojis, trying simplified version...");
-          // Try a very simple ASCII message without emojis first
-          messageToSign = "Welcome to Pay-Peer-Roll App";
-          console.log("Simplified message:", messageToSign);
-        }
-        
-        console.log("Trying to sign with message format:", messageToSign);
+        // The message format is now handled at the wallet level, so we use the message as-is
+        console.log("Signing message:", messageToSign);
         
         const result = signerEth.signMessage(derivationPath, messageToSign);
         signObservable = result.observable;
