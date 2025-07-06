@@ -48,6 +48,14 @@ export default function Dashboard() {
       icon: "🖥️",
       href: "/intmax-client",
     },
+    {
+      id: "intmax-bridge",
+      title: "INTMAX Bridge",
+      subtitle: "🌉 EIP-712 Signing",
+      description: "Bridge ETH to INTMAX with Ledger EIP-712 signatures",
+      icon: "📝",
+      href: "/intmax-bridge",
+    },
   ]
 
   return (
