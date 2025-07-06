@@ -62,6 +62,14 @@ export default function Dashboard() {
       icon: "📝",
       href: "/intmax-bridge",
     },
+    {
+      id: "clear-signing",
+      title: "Clear Signing Generator",
+      subtitle: "📋 ERC-7730 JSON Builder",
+      description: "Generate metadata files for Ledger Clear Signing",
+      icon: "🔍",
+      href: "/clear-signing",
+    },
   ]
 
   return (
