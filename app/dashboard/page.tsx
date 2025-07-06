@@ -32,6 +32,30 @@ export default function Dashboard() {
       icon: "💸",
       href: "/launch",
     },
+    {
+      id: "intmax",
+      title: "INTMAX Integration",
+      subtitle: "⚡ Privacy Mixing",
+      description: "Deposit, withdraw, and distribute with privacy",
+      icon: "🔒",
+      href: "/intmax",
+    },
+    {
+      id: "intmax-client",
+      title: "INTMAX Client SDK",
+      subtitle: "🚀 Frontend Integration",
+      description: "Direct client-side INTMAX integration",
+      icon: "🖥️",
+      href: "/intmax-client",
+    },
+    {
+      id: "intmax-bridge",
+      title: "INTMAX Bridge",
+      subtitle: "🌉 EIP-712 Signing",
+      description: "Bridge ETH to INTMAX with Ledger EIP-712 signatures",
+      icon: "📝",
+      href: "/intmax-bridge",
+    },
   ]
 
   return (
@@ -90,7 +114,7 @@ export default function Dashboard() {
               </div>
 
               {/* Application Icons */}
-              <div className="grid md:grid-cols-3 gap-6 mb-6">
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                 {applications.map((app) => (
                   <Link key={app.id} href={app.href}>
                     <div
